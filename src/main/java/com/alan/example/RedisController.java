@@ -2,39 +2,43 @@ package com.alan.example;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.context.annotation.Bean;
+import org.springframework.data.redis.core.ReactiveRedisOperations;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.reactive.function.server.RequestPredicates;
+import org.springframework.web.reactive.function.server.RouterFunction;
+import org.springframework.web.reactive.function.server.RouterFunctions;
+import org.springframework.web.reactive.function.server.ServerResponse;
 
-import java.util.Random;
+import java.util.UUID;
 
 /**
  * @author Alan Dávila<br>
- *         e-mail ustargab@gmail.com<br>
- *         28 dic. 2016 19:27
+ * e-mail ustargab@gmail.com<br>
+ * 28 dic. 2016 19:27
  */
 @RestController
-@RequestMapping("/redis/api/v1")
 @Slf4j
 public class RedisController {
 
     @Autowired
-    private RedisTemplate<String, ImportTarget> importTargetTemplate;
-    @Value("${redis.topic}")
-    private String topic;
+    ReactiveRedisOperations<String, BusinessData> businessDataTemplate;
 
-    @RequestMapping(value = "/send", method = RequestMethod.GET)
-    public ResponseEntity<?> sendRedis(){
-        log.info("enter");
-        final ImportTarget it = new ImportTarget();
-        it.setServerid(new Random().nextLong());
-        importTargetTemplate.convertAndSend(topic, it);
-        log.info("response:" + it.toString());
-        return new ResponseEntity<>(HttpStatus.OK);
+    @Bean
+    RouterFunction<ServerResponse> publish() {
+        return RouterFunctions.route(RequestPredicates.GET("/publish/{text}"),
+                req -> {
+                    String idTran = UUID.randomUUID().toString();
+                    Long inTs = System.currentTimeMillis();
+                    BusinessData bd = BusinessData.builder().idTran(idTran)
+                            .inputTimestamp(inTs)
+                            .data(req.pathVariable("text")).build();
+                    return ServerResponse.ok().body(
+                            businessDataTemplate.convertAndSend("testtopic", bd)
+                            , BusinessData.class);
+                }
+
+        );
     }
+
 }

@@ -1,17 +1,16 @@
 package com.alan.example;
 
-import org.springframework.beans.factory.annotation.Value;
+import io.lettuce.core.ClientOptions;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.listener.PatternTopic;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
-import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.ReactiveRedisOperations;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.RedisSerializer;
 
 @SpringBootApplication
 public class RedidSpringApplication {
@@ -21,48 +20,24 @@ public class RedidSpringApplication {
     }
 
     @Bean
-    public ImportTargetListener importTargetListener() {
-        return new ImportTargetListener();
-    }
-    @Value("${redis.topic}")
-    private String topic;
-    @Value("${redis.host}")
-    private String host;
-    @Value("${redis.port}")
-    private Integer port;
+    public LettuceConnectionFactory connectionFactory() {
+        LettuceClientConfiguration configuration = LettuceClientConfiguration.builder()
+                .clientName("publish")
+                .clientOptions(ClientOptions.builder()
+                        .build()).build();
 
-    @Bean
-    public MessageListenerAdapter listenerAdapter(ImportTargetListener importTargetListener) {
-        MessageListenerAdapter messageListenerAdapter = new
-                MessageListenerAdapter(importTargetListener);
-        messageListenerAdapter
-                .setSerializer(new Jackson2JsonRedisSerializer<>(ImportTarget.class));
-        return messageListenerAdapter;
+        return new LettuceConnectionFactory();
     }
 
-    @Bean
-    public JedisConnectionFactory connectionFactory() {
-        JedisConnectionFactory con = new JedisConnectionFactory();
-        con.setHostName("localhost");
-        con.setPort(18840);
-        con.setDatabase(2);
-        return con;
-    }
 
     @Bean
-    public RedisMessageListenerContainer container(RedisConnectionFactory connectionFactory,
-                                                   MessageListenerAdapter messageListenerAdapter) {
-        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(messageListenerAdapter, new PatternTopic(topic));
-        return container;
+    public ReactiveRedisOperations<String, BusinessData> businessDataTemplate(LettuceConnectionFactory lettuceConnectionFactory) {
+        RedisSerializer<BusinessData> valueSerializer = new Jackson2JsonRedisSerializer<>(BusinessData.class);
+        RedisSerializationContext<String, BusinessData> serializationContext = RedisSerializationContext.<String, BusinessData>newSerializationContext(RedisSerializer.string())
+                .value(valueSerializer)
+                .build();
+        return new ReactiveRedisTemplate<String, BusinessData>(lettuceConnectionFactory, serializationContext);
     }
 
-    @Bean
-    public RedisTemplate<String, ImportTarget> importTargetCache(JedisConnectionFactory connectionFactory) {
-        final RedisTemplate<String, ImportTarget> importTargetCache = new RedisTemplate<>();
-        importTargetCache.setConnectionFactory(connectionFactory);
-        importTargetCache.setDefaultSerializer(new Jackson2JsonRedisSerializer<>(ImportTarget.class));
-        return importTargetCache;
-    }
+
 }
