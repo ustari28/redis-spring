@@ -20,7 +20,6 @@ public class ConsumerService {
         businessDataTemplate.listenTo(ChannelTopic.of("testtopic"))
                 .map(ReactiveSubscription.Message::getMessage)
                 .subscribe(c -> {
-                    c.setProcessTimestamp(System.currentTimeMillis());
                     log.info("message {}", c);
                 });
     }

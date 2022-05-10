@@ -30,14 +30,12 @@ public class RedisController {
                 req -> {
                     String idTran = UUID.randomUUID().toString();
                     Long inTs = System.currentTimeMillis();
-                    BusinessData bd = BusinessData.builder().idTran(idTran)
-                            .inputTimestamp(inTs)
-                            .data(req.pathVariable("text")).build();
+                    BusinessData bd = new BusinessData(idTran, req.pathVariable("text"), inTs);
+                    log.info("Sending object");
                     return ServerResponse.ok().body(
                             businessDataTemplate.convertAndSend("testtopic", bd)
                             , BusinessData.class);
                 }
-
         );
     }
 
